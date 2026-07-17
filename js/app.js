@@ -1,7 +1,6 @@
 'use strict';
 
 let rules        = [];
-let globalRules  = [];
 let selectedFile = null;
 let activeTab    = 'text';
 let profilesData = {};
@@ -9,7 +8,6 @@ let dropdownOpen = false;
 let configOpen   = false;
 
 const PROFILES_KEY    = 'ofusca-profiles';
-const GLOBAL_RULES_KEY = 'ofusca-global-rules';
 
 /* ════════════════════════════════
    THEME
@@ -135,16 +133,6 @@ function loadProfiles() {
     profilesData = {};
   }
   renderProfileDropdown();
-  const enabledGlobals = globalRules.filter(r => r.enabled);
-  if (enabledGlobals.length > 0) {
-    const existingRuleIds = rules.map(r => r.id);
-    enabledGlobals.forEach(g => {
-      if (!existingRuleIds.includes(g.id)) {
-        rules.push({ ...g });
-      }
-    });
-    renderRules();
-  }
   if (profilesData['default'] && profilesData['default'].length > 0) {
     applyProfile('default');
   }
@@ -216,8 +204,7 @@ function saveProfile() {
 function applyProfile(name) {
   const profileRules = profilesData[name] || [];
   const existingRuleIds = rules.map(r => r.id);
-  const filteredProfileRules = profileRules.filter(r => !globalRules.some(g => g.id === r.id));
-  filteredProfileRules.forEach((r, i) => {
+  profileRules.forEach((r, i) => {
     if (!existingRuleIds.includes(r.id)) {
       rules.push({ ...r, id: Date.now() + i, case_sensitive: !!r.case_sensitive });
     }
@@ -253,22 +240,6 @@ function closeConfigPanel() {
 }
 
 function renderConfigPanel() {
-  const globalRulesContainer = document.getElementById('config-global-rules');
-  globalRulesContainer.innerHTML = '';
-  globalRules.forEach(rule => {
-    const div = document.createElement('div');
-    div.className = 'config-item';
-    div.innerHTML = `
-      <input type="checkbox" ${rule.enabled ? 'checked' : ''}
-             onchange="toggleGlobalRule('${rule.id}')"
-             title="Activar/desactivar esta regla">
-      <div class="config-item-readonly">
-        <strong>${esc(rule.from)}</strong> → <strong>${esc(rule.to)}</strong>
-        <span class="type-pill pill-${rule.type}">${rule.type}</span>
-      </div>
-    `;
-    globalRulesContainer.appendChild(div);
-  });
   const profilesContainer = document.getElementById('config-profiles');
   profilesContainer.innerHTML = '';
   const names = Object.keys(profilesData).sort((a, b) => a.localeCompare(b));
@@ -290,37 +261,7 @@ function renderConfigPanel() {
   }
 }
 
-function toggleGlobalRule(id) {
-  const rule = globalRules.find(r => r.id === id);
-  if (rule) {
-    rule.enabled = !rule.enabled;
-    const currentRule = rules.find(r => r.id === id);
-    if (currentRule) {
-      currentRule.enabled = rule.enabled;
-    }
-    renderConfigPanel();
-  }
-}
-
-function addGlobalRule() {
-  const newRule = {
-    id: 'global-' + Date.now(),
-    type: 'regex',
-    from: '',
-    to: '',
-    case_sensitive: false,
-    enabled: true
-  };
-  globalRules.push(newRule);
-  renderConfigPanel();
-}
-
 function saveConfig() {
-  const globals = globalRules.map(r => ({
-    id: r.id, type: r.type, from: r.from, to: r.to,
-    case_sensitive: !!r.case_sensitive, enabled: r.enabled
-  }));
-  localStorage.setItem(GLOBAL_RULES_KEY, JSON.stringify(globals));
   closeConfigPanel();
   loadProfiles();
   showError('Configuración guardada exitosamente');
@@ -407,7 +348,7 @@ function clearFile() {
   document.getElementById('file-progress').style.display = 'none';
 }
 
-const MAX_FILE_MB = 200;
+const MAX_FILE_MB = 100;
 
 function runFile() {
   if (!selectedFile) return showError('Seleccioná un archivo primero.');
@@ -596,29 +537,8 @@ document.addEventListener('keydown', e => {
 /* ════════════════════════════════
    INIT
    ════════════════════════════════ */
-function initGlobalRules() {
-  try {
-    globalRules = JSON.parse(localStorage.getItem(GLOBAL_RULES_KEY)) || [];
-  } catch {
-    globalRules = [];
-  }
-  if (!globalRules.length) {
-    globalRules = [
-      {
-        id: 'global-usuario',
-        type: 'regex',
-        from: '([A-Za-z])([0-9]{6})',
-        to: 'USUARIO-\\1',
-        case_sensitive: false,
-        enabled: true
-      }
-    ];
-  }
-}
-
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
-  initGlobalRules();
   rules = [
     { id: 1, type: 'literal', from: 'dominio.com', to: 'localhost.local', case_sensitive: false },
     { id: 2, type: 'regex',   from: '10\\.1\\.',   to: '192.168.',        case_sensitive: false },
