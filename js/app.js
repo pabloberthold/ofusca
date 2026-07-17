@@ -1,8 +1,9 @@
 'use strict';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const PROFILES_KEY = 'ofusca-profiles';
 const MAX_UNDO = 50;
+const MAX_FILE_MB = 100;
 
 let rules         = [];
 let selectedFiles = [];
@@ -69,7 +70,7 @@ function applyRules(text, rules) {
         totalMatches += count;
         rulesUsed++;
       }
-    } catch (e) { /* skip invalid regex */ }
+    } catch (e) { if (e instanceof SyntaxError) continue; throw e; }
   }
   return { result: text, matches: totalMatches, rulesUsed };
 }
@@ -217,7 +218,7 @@ function renderRules() {
         <input class="rule-field" type="text"
                placeholder="reemplazar por…"
                value="${esc(rule.to)}"
-               oninput="updateRule(${rule.id},'to',this.value)" />
+               oninput="updateRule(${rule.id},'to',this.value);renderRules()" />
       </div>`;
     c.appendChild(d);
   });
@@ -352,7 +353,7 @@ function importProfiles(input) {
       Object.assign(profilesData, data);
       _persistProfiles();
       loadProfiles();
-      showError(`Importados ${Object.keys(data).length} perfil(es) exitosamente`);
+      showSuccess(`Importados ${Object.keys(data).length} perfil(es)`);
     } catch (e) { showError('Error al importar: ' + e.message); }
   };
   reader.readAsText(input.files[0], 'utf-8');
@@ -451,7 +452,7 @@ function copyShareLink(withResult = false) {
   }
   const url = window.location.origin + base + (params.length ? '#' + params.join('&') : '');
   copyToClipboard(url);
-  showError('Enlace copiado al portapapeles');
+  showSuccess('Enlace copiado al portapapeles');
 }
 
 function copyToClipboard(text) {
@@ -478,13 +479,13 @@ function exportRulesSnippet() {
   if (!serialized.length) return showError('No hay reglas para exportar.');
   const text = serialized.map(r => `${r.type === 'regex' ? 'REGEX' : 'LITERAL'}  ${r.from}  →  ${r.to}`).join('\n');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => showError('Reglas copiadas al portapapeles'));
+    navigator.clipboard.writeText(text).then(() => showSuccess('Reglas copiadas al portapapeles'));
   } else {
     const ta = document.createElement('textarea');
     ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
-    showError('Reglas copiadas al portapapeles');
+    showSuccess('Reglas copiadas al portapapeles');
   }
 }
 
@@ -509,13 +510,16 @@ function updateInputCount() {
     len === 0 ? '0 caracteres' : `${len.toLocaleString('es')} caracteres`;
 }
 
-function runText() {
+function runText(reverse = false) {
   activarNeonBox('#output-pane');
   const text = document.getElementById('input-text').value;
   if (!text.trim()) return showError('No hay texto en la entrada.');
   clearError();
+  const rulesToApply = reverse
+    ? serializeRules().slice().reverse().map(r => ({ type: r.type, from: r.to, to: r.from }))
+    : serializeRules();
   const t0 = performance.now();
-  const { result, matches, rulesUsed } = applyRules(text, serializeRules());
+  const { result, matches, rulesUsed } = applyRules(text, rulesToApply);
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
@@ -523,17 +527,7 @@ function runText() {
 }
 
 function runTextReverse() {
-  activarNeonBox('#output-pane');
-  const text = document.getElementById('input-text').value;
-  if (!text.trim()) return showError('No hay texto en la entrada.');
-  clearError();
-  const reversedRules = serializeRules().slice().reverse().map(r => ({ type: r.type, from: r.to, to: r.from }));
-  const t0 = performance.now();
-  const { result, matches, rulesUsed } = applyRules(text, reversedRules);
-  const ms = Math.round((performance.now() - t0) * 100) / 100;
-  document.getElementById('output-text').value = result;
-  updateDiffView(text, result);
-  showStats({ matches, rules_used: rulesUsed, ms });
+  runText(true);
 }
 
 function clearOutput() {
@@ -571,10 +565,6 @@ function updateDiffView(input, output) {
   }
 }
 
-function escHtml(s) {
-  return esc(s);
-}
-
 function generateDiffHTML(a, b) {
   const linesA = a.split('\n');
   const linesB = b.split('\n');
@@ -584,10 +574,10 @@ function generateDiffHTML(a, b) {
     const lineA = i < linesA.length ? linesA[i] : '';
     const lineB = i < linesB.length ? linesB[i] : '';
     if (lineA === lineB) {
-      html += `<tr class="diff-same"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineA)}</td></tr>`;
+      html += `<tr class="diff-same"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`;
     } else {
       if (lineA !== '') {
-        html += `<tr class="diff-removed"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineA)}</td></tr>`;
+        html += `<tr class="diff-removed"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`;
       }
       if (lineB !== '') {
         html += `<tr class="diff-added"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineB)}</td></tr>`;
@@ -648,8 +638,6 @@ function clearFile() {
   document.getElementById('file-multi').style.display = 'none';
   document.getElementById('file-progress').style.display = 'none';
 }
-
-const MAX_FILE_MB = 100;
 
 function runFile() {
   if (!selectedFiles.length) return showError('Seleccioná un archivo primero.');
@@ -791,10 +779,19 @@ function showStats(s) {
   document.getElementById('stat-ms').textContent = s.ms != null ? (s.ms < 1 ? '<1' : s.ms) : 0;
 }
 
+function showSuccess(msg) {
+  const b = document.getElementById('error-bar');
+  b.textContent = '✓ ' + msg;
+  b.style.display = 'block';
+  b.style.background = 'var(--success)';
+  setTimeout(() => { b.style.display = 'none'; b.style.background = ''; }, 4000);
+}
+
 function showError(msg) {
   const b = document.getElementById('error-bar');
   b.textContent = msg;
   b.style.display = 'block';
+  b.style.background = '';
   setTimeout(() => { b.style.display = 'none'; }, 6000);
 }
 
