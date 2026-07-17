@@ -9,7 +9,7 @@ let selectedFiles = [];
 let activeTab     = 'text';
 let profilesData  = {};
 let dropdownOpen  = false;
-let configOpen    = false;
+
 let dragSrcIndex  = null;
 let rulesFilter   = '';
 let undoStack     = [];
@@ -491,45 +491,6 @@ function exportRulesSnippet() {
 /* ════════════════════════════════
    CONFIGURATION PANEL
    ════════════════════════════════ */
-function toggleConfigPanel() {
-  configOpen = true;
-  document.getElementById('config-overlay').style.display = 'flex';
-  renderConfigPanel();
-}
-
-function closeConfigPanel() {
-  configOpen = false;
-  document.getElementById('config-overlay').style.display = 'none';
-}
-
-function renderConfigPanel() {
-  const profilesContainer = document.getElementById('config-profiles');
-  profilesContainer.innerHTML = '';
-  const names = Object.keys(profilesData).sort((a, b) => a.localeCompare(b));
-  if (!names.length) {
-    profilesContainer.innerHTML = '<div class="config-section-empty">Sin perfiles guardados</div>';
-  } else {
-    names.forEach(name => {
-      const d = document.createElement('div');
-      d.className = 'config-item';
-      d.innerHTML = `
-        <input type="checkbox" ${name === 'default' ? 'checked' : ''}
-               onchange="applyProfile('${esc(name)}')"
-               ${name === 'default' ? 'disabled' : ''}
-               title="${name === 'default' ? 'Perfil por defecto' : 'Cargar perfil'}">
-        <span class="config-item-readonly">${esc(name)}${name === 'default' ? ' <span class="default-badge">default</span>' : ''}</span>
-      `;
-      profilesContainer.appendChild(d);
-    });
-  }
-}
-
-function saveConfig() {
-  closeConfigPanel();
-  loadProfiles();
-  showError('Configuración guardada exitosamente');
-}
-
 /* ════════════════════════════════
    TABS
    ════════════════════════════════ */
