@@ -524,6 +524,7 @@ function runText(reverse = false) {
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
   showStats({ matches, rules_used: rulesUsed, ms });
+  flashHighlight(text, result);
 }
 
 function runTextReverse() {
@@ -569,23 +570,23 @@ function generateDiffHTML(a, b) {
   const linesA = a.split('\n');
   const linesB = b.split('\n');
   const max = Math.max(linesA.length, linesB.length);
-  let html = '<div class="diff-container"><table class="diff-table">';
+  const parts = ['<div class="diff-container"><table class="diff-table">'];
   for (let i = 0; i < max; i++) {
     const lineA = i < linesA.length ? linesA[i] : '';
     const lineB = i < linesB.length ? linesB[i] : '';
     if (lineA === lineB) {
-      html += `<tr class="diff-same"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`;
+      parts.push(`<tr class="diff-same"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`);
     } else {
       if (lineA !== '') {
-        html += `<tr class="diff-removed"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`;
+        parts.push(`<tr class="diff-removed"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineA)}</td></tr>`);
       }
       if (lineB !== '') {
-        html += `<tr class="diff-added"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineB)}</td></tr>`;
+        parts.push(`<tr class="diff-added"><td class="diff-num">${i + 1}</td><td class="diff-code">${esc(lineB)}</td></tr>`);
       }
     }
   }
-  html += '</table></div>';
-  return html;
+  parts.push('</table></div>');
+  return parts.join('');
 }
 
 /* ════════════════════════════════
@@ -705,6 +706,7 @@ function processFile(file, idx, total) {
       fill.style.width = '100%';
       label.textContent = `✓ ${total} archivo${total !== 1 ? 's' : ''} transformado${total !== 1 ? 's' : ''}`;
       showStats({ matches, rules_used: rulesUsed, ms });
+      flashHighlight(text, result);
       setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 5000);
     }
   };
@@ -870,4 +872,35 @@ function activarNeonBox(selector = '.editor-pane') {
   if (el._neonTimeout) clearTimeout(el._neonTimeout);
   el.classList.add('neon-box');
   el._neonTimeout = setTimeout(() => { el.classList.remove('neon-box'); el._neonTimeout = null; }, 1200);
+}
+
+function flashHighlight(input, output) {
+  if (!output) return;
+  const linesA = input ? input.split('\n') : [];
+  const linesB = output.split('\n');
+  const max = Math.max(linesA.length, linesB.length);
+  const parts = [];
+  for (let i = 0; i < max; i++) {
+    const lineA = i < linesA.length ? linesA[i] : '';
+    const lineB = i < linesB.length ? linesB[i] : '';
+    const changed = lineA !== lineB;
+    parts.push(`<div${changed ? ' class="flash-changed"' : ''}>${esc(lineB || ' ')}</div>`);
+  }
+
+  const existing = document.getElementById('output-flash');
+  if (existing) existing.remove();
+
+  const flash = document.createElement('div');
+  flash.id = 'output-flash';
+  flash.className = 'output-flash';
+  flash.innerHTML = parts.join('');
+
+  const textarea = document.getElementById('output-text');
+  const container = textarea.parentNode;
+  container.appendChild(flash);
+
+  setTimeout(() => {
+    flash.style.opacity = '0';
+    setTimeout(() => flash.remove(), 500);
+  }, 4000);
 }
