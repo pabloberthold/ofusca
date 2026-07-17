@@ -912,11 +912,8 @@ function flashHighlight(input, output) {
   textarea.parentNode.insertBefore(flash, diffView);
 
   setTimeout(() => {
-    flash.style.opacity = '0';
-    setTimeout(() => {
-      flash.remove();
-      textarea.style.display = '';
-    }, 500);
+    flash.remove();
+    textarea.style.display = '';
   }, 3000);
 }
 

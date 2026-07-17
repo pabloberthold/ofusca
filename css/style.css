@@ -1342,7 +1342,6 @@ html, body {
   padding: 14px 16px;
   white-space: pre-wrap;
   word-break: break-word;
-  transition: opacity 0.5s ease;
 }
 .output-flash .flash-changed {
   background: var(--flash-bg);
