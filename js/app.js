@@ -253,10 +253,10 @@ function saveProfile() {
   document.getElementById('profile-name').value = '';
   loadProfiles();
   const btn = document.querySelector('.btn-save-profile');
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Guardado';
+  const orig = btn.textContent;
+  btn.textContent = '✓ Guardado';
   btn.style.background = 'var(--success)';
-  setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+  setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 2000);
 }
 
 function applyProfile(name) {

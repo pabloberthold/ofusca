@@ -124,7 +124,7 @@ html, body {
 }
 
 .sidebar-block {
-  padding: 16px 16px 14px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -268,17 +268,18 @@ html, body {
 
 .profile-save-row {
   display: flex;
-  gap: 7px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 .profile-input {
   flex: 1;
+  min-width: 0;
   background: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 12px;
-  padding: 7px 10px;
+  padding: 7px 9px;
   outline: none;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
@@ -289,18 +290,15 @@ html, body {
 .profile-input::placeholder { color: var(--text-muted); }
 
 .btn-save-profile {
+  flex-shrink: 0;
   background: var(--accent);
   border: none;
   border-radius: var(--radius-md);
   color: #fff;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 7px 12px;
+  padding: 7px 10px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
   transition: background var(--transition), box-shadow var(--transition);
   box-shadow: 0 1px 4px rgba(139,92,246,0.3);
 }
@@ -1203,19 +1201,20 @@ html, body {
 }
 .btn-profile-io {
   flex: 1;
+  min-width: 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 10.5px;
   font-weight: 500;
-  padding: 5px 8px;
+  padding: 4px 6px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  text-align: center;
   transition: all var(--transition);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .btn-profile-io:hover {
   background: var(--bg-hover);
