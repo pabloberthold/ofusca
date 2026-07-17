@@ -1,0 +1,42 @@
+.neon-box {
+  position: relative;
+  border-radius: 16px;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.neon-box::before {
+  z-index: 0;
+  content: "";
+  position: absolute;
+  inset: -100%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 60deg,
+    #a78bfa 90deg,
+    #7c3aed 120deg,
+    transparent 150deg,
+    transparent 360deg
+  );
+  animation: spin 3.5s linear infinite;
+}
+
+.neon-box::after {
+  z-index: 1;
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: var(--bg-surface);
+  border-radius: 14px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.editor-pane .pane-header,
+.editor-pane textarea {
+  position: relative;
+  z-index: 2;
+}
