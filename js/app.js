@@ -88,7 +88,6 @@ function undo() {
   redoStack.push(JSON.parse(JSON.stringify(rules)));
   rules = undoStack.pop();
   renderRules();
-  encodeRulesToURL();
 }
 
 function redo() {
@@ -96,7 +95,6 @@ function redo() {
   undoStack.push(JSON.parse(JSON.stringify(rules)));
   rules = redoStack.pop();
   renderRules();
-  encodeRulesToURL();
 }
 
 /* ════════════════════════════════
@@ -106,14 +104,12 @@ function addRule(type) {
   pushUndo();
   rules.push({ id: Date.now(), type, from: '', to: '', case_sensitive: false, enabled: true });
   renderRules();
-  encodeRulesToURL();
 }
 
 function removeRule(id) {
   pushUndo();
   rules = rules.filter(r => r.id !== id);
   renderRules();
-  encodeRulesToURL();
 }
 
 function updateRule(id, field, value) {
@@ -166,7 +162,6 @@ function handleDragEnd(e) {
   if (changed) pushUndo();
   rules = newOrder.filter(Boolean);
   renderRules();
-  if (changed) encodeRulesToURL();
 }
 
 function renderRules() {
@@ -321,7 +316,6 @@ function applyProfile(name) {
   document.getElementById('profile-dropdown').style.display = 'none';
   document.getElementById('profile-chevron').classList.remove('open');
   dropdownOpen = false;
-  encodeRulesToURL();
 }
 
 function deleteProfile(name) {
@@ -438,20 +432,42 @@ function decodeResultFromURL() {
 }
 
 function copyShareLink(withResult = false) {
+  const base = window.location.pathname;
+  const params = [];
+  const activeRules = rules.filter(r => r.from || r.to);
+  if (activeRules.length) {
+    try {
+      params.push('r=' + btoa(JSON.stringify(activeRules.map(r => ({
+        type: r.type, from: r.from, to: r.to,
+        case_sensitive: !!r.case_sensitive, enabled: r.enabled !== false
+      })))));
+    } catch {}
+  }
   if (withResult) {
     const output = document.getElementById('output-text').value;
-    if (output) encodeResultToURL(output);
+    if (output) {
+      try { params.push('o=' + btoa(unescape(encodeURIComponent(output)))); } catch {}
+    }
   }
-  const url = window.location.href;
+  const url = window.location.origin + base + (params.length ? '#' + params.join('&') : '');
+  copyToClipboard(url);
+  showError('Enlace copiado al portapapeles');
+}
+
+function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => showError('Enlace copiado al portapapeles'));
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
   } else {
-    const ta = document.createElement('textarea');
-    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
-    showError('Enlace copiado al portapapeles');
+    fallbackCopy(text);
   }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (_) {}
+  document.body.removeChild(ta);
 }
 
 /* ════════════════════════════════
@@ -543,7 +559,6 @@ function runText() {
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
-  encodeResultToURL(result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
@@ -558,7 +573,6 @@ function runTextReverse() {
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
-  encodeResultToURL(result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
@@ -569,7 +583,6 @@ function clearOutput() {
   document.getElementById('diff-view').style.display = 'none';
   document.getElementById('output-text').style.display = '';
   document.getElementById('diff-btn').textContent = 'Diff';
-  encodeResultToURL('');
 }
 
 /* ════════════════════════════════
@@ -767,7 +780,6 @@ function clearAll() {
   diffMode = false;
   const db = document.getElementById('diff-btn');
   if (db) db.textContent = 'Diff';
-  encodeResultToURL('');
   document.getElementById('input-count').textContent = '0 caracteres';
   document.getElementById('stats-panel').style.display = 'none';
   clearError();
