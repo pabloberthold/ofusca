@@ -876,19 +876,24 @@ function activarNeonBox(selector = '.editor-pane') {
 
 function flashHighlight(input, output) {
   if (!output) return;
+
+  const existing = document.getElementById('output-flash');
+  if (existing) existing.remove();
+
   const linesA = input ? input.split('\n') : [];
   const linesB = output.split('\n');
   const max = Math.max(linesA.length, linesB.length);
   const parts = [];
+
   for (let i = 0; i < max; i++) {
     const lineA = i < linesA.length ? linesA[i] : '';
     const lineB = i < linesB.length ? linesB[i] : '';
-    const changed = lineA !== lineB;
-    parts.push(`<div${changed ? ' class="flash-changed"' : ''}>${esc(lineB || ' ')}</div>`);
+    if (lineA === lineB) {
+      parts.push(`<div>${esc(lineB || ' ')}</div>`);
+    } else {
+      parts.push(`<div>${tokenHighlight(lineA, lineB)}</div>`);
+    }
   }
-
-  const existing = document.getElementById('output-flash');
-  if (existing) existing.remove();
 
   const flash = document.createElement('div');
   flash.id = 'output-flash';
@@ -896,11 +901,33 @@ function flashHighlight(input, output) {
   flash.innerHTML = parts.join('');
 
   const textarea = document.getElementById('output-text');
-  const container = textarea.parentNode;
-  container.appendChild(flash);
+  const diffView = document.getElementById('diff-view');
+  textarea.style.display = 'none';
+  diffView.style.display = 'none';
+  textarea.parentNode.insertBefore(flash, diffView);
 
   setTimeout(() => {
     flash.style.opacity = '0';
-    setTimeout(() => flash.remove(), 500);
+    setTimeout(() => {
+      flash.remove();
+      textarea.style.display = '';
+    }, 500);
   }, 4000);
+}
+
+function tokenHighlight(lineA, lineB) {
+  const tokensA = lineA.split(/(\s+)/);
+  const tokensB = lineB.split(/(\s+)/);
+  const maxLen = Math.max(tokensA.length, tokensB.length);
+  let html = '';
+  for (let i = 0; i < maxLen; i++) {
+    const a = i < tokensA.length ? tokensA[i] : '';
+    const b = i < tokensB.length ? tokensB[i] : '';
+    if (a !== b) {
+      html += `<span class="flash-changed">${esc(b)}</span>`;
+    } else {
+      html += esc(b);
+    }
+  }
+  return html || ' ';
 }
