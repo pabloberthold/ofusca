@@ -1307,26 +1307,12 @@ html, body {
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 12px;
-  table-layout: fixed;
 }
-.diff-table td, .diff-table th {
+.diff-table td {
   padding: 1px 8px;
   vertical-align: top;
   white-space: pre-wrap;
   word-break: break-all;
-}
-.diff-header th {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 5px 8px;
 }
 .diff-num {
   width: 36px;
@@ -1334,15 +1320,13 @@ html, body {
   color: var(--text-muted);
   user-select: none;
   font-size: 11px;
-}
-.diff-code-left {
   border-right: 1px solid var(--border-subtle);
+  padding-right: 8px !important;
 }
+.diff-code { padding-left: 8px !important; }
 .diff-same td { color: var(--text-secondary); }
-.diff-changed td.diff-code-left { background: rgba(239,68,68,0.10); color: var(--danger); }
-.diff-changed td.diff-code-right { background: rgba(16,185,129,0.12); color: var(--success); }
-.diff-added td.diff-code-right { background: rgba(16,185,129,0.12); color: var(--success); }
-.diff-removed td.diff-code-left { background: rgba(239,68,68,0.10); color: var(--danger); }
+.diff-added td { background: rgba(16,185,129,0.12); color: var(--success); }
+.diff-removed td { background: rgba(239,68,68,0.10); color: var(--danger); }
 
 /* ── FLASH HIGHLIGHT ── */
 .output-flash {

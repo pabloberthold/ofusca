@@ -570,24 +570,24 @@ function generateDiffHTML(a, b) {
   const linesB = b.split('\n');
   const max = Math.max(linesA.length, linesB.length);
   let idxA = 0, idxB = 0;
-  const parts = ['<table class="diff-table">',
-    '<tr class="diff-header"><th class="diff-num">#</th><th class="diff-code-left">Original</th><th class="diff-num">#</th><th class="diff-code-right">Resultado</th></tr>'];
+  const parts = ['<table class="diff-table">'];
   for (let i = 0; i < max; i++) {
     const lineA = i < linesA.length ? linesA[i] : null;
     const lineB = i < linesB.length ? linesB[i] : null;
     if (lineA !== null && lineB !== null) {
       idxA++; idxB++;
       if (lineA === lineB) {
-        parts.push(`<tr class="diff-same"><td class="diff-num">${idxA}</td><td class="diff-code-left">${esc(lineA)}</td><td class="diff-num">${idxB}</td><td class="diff-code-right">${esc(lineB)}</td></tr>`);
+        parts.push(`<tr class="diff-same"><td class="diff-num">${idxA}</td><td class="diff-code">${esc(lineA)}</td></tr>`);
       } else {
-        parts.push(`<tr class="diff-changed"><td class="diff-num">${idxA}</td><td class="diff-code-left">${esc(lineA)}</td><td class="diff-num">${idxB}</td><td class="diff-code-right">${esc(lineB)}</td></tr>`);
+        parts.push(`<tr class="diff-removed"><td class="diff-num">${idxA}</td><td class="diff-code">${esc(lineA)}</td></tr>`);
+        parts.push(`<tr class="diff-added"><td class="diff-num">${idxB}</td><td class="diff-code">${esc(lineB)}</td></tr>`);
       }
     } else if (lineA !== null) {
       idxA++;
-      parts.push(`<tr class="diff-removed"><td class="diff-num">${idxA}</td><td class="diff-code-left">${esc(lineA)}</td><td class="diff-num"></td><td class="diff-code-right"></td></tr>`);
+      parts.push(`<tr class="diff-removed"><td class="diff-num">${idxA}</td><td class="diff-code">${esc(lineA)}</td></tr>`);
     } else {
       idxB++;
-      parts.push(`<tr class="diff-added"><td class="diff-num"></td><td class="diff-code-left"></td><td class="diff-num">${idxB}</td><td class="diff-code-right">${esc(lineB)}</td></tr>`);
+      parts.push(`<tr class="diff-added"><td class="diff-num">${idxB}</td><td class="diff-code">${esc(lineB)}</td></tr>`);
     }
   }
   parts.push('</table>');
