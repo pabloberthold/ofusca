@@ -105,13 +105,16 @@ html, body {
 }
 
 .sidebar-brand {
-  padding: 22px 20px 18px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .brand-logo {
-  max-width: 150px;
-  max-height: 52px;
-  object-fit: contain;
+  width: 40px;
+  height: auto;
+  margin-bottom: 8px;
 }
 .brand-name {
   font-size: 22px;
