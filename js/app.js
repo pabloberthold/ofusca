@@ -511,7 +511,6 @@ function updateInputCount() {
 }
 
 function runText(reverse = false) {
-  activarNeonBox('#output-pane');
   const text = document.getElementById('input-text').value;
   if (!text.trim()) return showError('No hay texto en la entrada.');
   clearError();
