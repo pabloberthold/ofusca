@@ -1,0 +1,10 @@
+{
+  "name": "Ofusca — Enmascarador de contenido",
+  "short_name": "Ofusca",
+  "description": "Herramienta client-side para ofuscar contenido sensible mediante reglas de reemplazo",
+  "start_url": "/ofusca/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#8b5cf6",
+  "icons": []
+}

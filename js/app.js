@@ -1,13 +1,15 @@
 'use strict';
 
+const APP_VERSION = '1.0.0';
+const PROFILES_KEY = 'ofusca-profiles';
+
 let rules        = [];
 let selectedFile = null;
 let activeTab    = 'text';
 let profilesData = {};
 let dropdownOpen = false;
 let configOpen   = false;
-
-const PROFILES_KEY    = 'ofusca-profiles';
+let dragSrcIndex = null;
 
 /* ════════════════════════════════
    THEME
@@ -38,6 +40,7 @@ function applyRules(text, rules) {
   let totalMatches = 0;
   let rulesUsed = 0;
   for (const rule of rules) {
+    if (rule.enabled === false) continue;
     const fromVal = rule.from || '';
     const toVal = rule.to || '';
     const caseSensitive = rule.case_sensitive || false;
@@ -60,7 +63,7 @@ function applyRules(text, rules) {
         rulesUsed++;
       }
     } catch (e) {
-      /* skip invalid regex */;
+      /* skip invalid regex */
     }
   }
   return { result: text, matches: totalMatches, rulesUsed };
@@ -70,7 +73,7 @@ function applyRules(text, rules) {
    RULES
    ════════════════════════════════ */
 function addRule(type) {
-  rules.push({ id: Date.now(), type, from: '', to: '', case_sensitive: false });
+  rules.push({ id: Date.now(), type, from: '', to: '', case_sensitive: false, enabled: true });
   renderRules();
 }
 
@@ -84,15 +87,69 @@ function updateRule(id, field, value) {
   if (r) r[field] = value;
 }
 
+function toggleRuleEnabled(id) {
+  const r = rules.find(r => r.id === id);
+  if (r) r.enabled = !r.enabled;
+}
+
+function validateRegex(str) {
+  if (!str) return null;
+  try { new RegExp(str); return null; }
+  catch (e) { return e.message; }
+}
+
+/* ── DRAG & DROP ── */
+function handleDragStart(e) {
+  dragSrcIndex = Array.from(document.getElementById('rules-list').children).indexOf(e.target.closest('.rule-card'));
+  e.target.closest('.rule-card').classList.add('dragging');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  const card = e.target.closest('.rule-card');
+  if (!card) return;
+  const list = document.getElementById('rules-list');
+  const idx = Array.from(list.children).indexOf(card);
+  if (idx === dragSrcIndex) return;
+  const rect = card.getBoundingClientRect();
+  const mid = rect.top + rect.height / 2;
+  if (e.clientY < mid) list.insertBefore(list.children[dragSrcIndex], card);
+  else list.insertBefore(list.children[dragSrcIndex], card.nextSibling);
+  dragSrcIndex = idx;
+}
+
+function handleDragEnd(e) {
+  e.target.closest('.rule-card').classList.remove('dragging');
+  const list = document.getElementById('rules-list');
+  const newOrder = Array.from(list.children).map(c => rules.find(r => r.id === +c.dataset.ruleId));
+  rules = newOrder.filter(Boolean);
+  renderRules();
+}
+
 function renderRules() {
   const c = document.getElementById('rules-list');
   c.innerHTML = '';
   rules.forEach(rule => {
     const d = document.createElement('div');
-    d.className = 'rule-card';
+    d.className = 'rule-card' + (rule.enabled === false ? ' rule-disabled' : '');
+    d.draggable = true;
+    d.dataset.ruleId = rule.id;
+    d.addEventListener('dragstart', handleDragStart);
+    d.addEventListener('dragover', handleDragOver);
+    d.addEventListener('dragend', handleDragEnd);
+
+    const regexErr = rule.type === 'regex' && rule.from ? validateRegex(rule.from) : null;
+    const fromClass = regexErr ? 'rule-field rule-field-error' : 'rule-field';
+
     d.innerHTML = `
       <div class="rule-card-top">
+        <span class="drag-handle" title="Arrastrar para reordenar">⠿</span>
         <span class="type-pill pill-${rule.type}">${rule.type}</span>
+        <label class="rule-enable-toggle" title="${rule.enabled === false ? 'Desactivada' : 'Activada'}">
+          <input type="checkbox" ${rule.enabled !== false ? 'checked' : ''}
+                 onchange="toggleRuleEnabled(${rule.id});renderRules()" />
+          <span class="toggle-track"><span class="toggle-knob"></span></span>
+        </label>
         <label class="cs-toggle" title="Case sensitive">
           <input type="checkbox" ${rule.case_sensitive ? 'checked' : ''}
                  onchange="updateRule(${rule.id},'case_sensitive',this.checked)" />
@@ -106,11 +163,12 @@ function renderRules() {
       </div>
       <div class="rule-row">
         <span class="rule-label">de</span>
-        <input class="rule-field" type="text"
+        <input class="${fromClass}" type="text"
                placeholder="${rule.type === 'regex' ? 'patrón regex…' : 'texto a buscar…'}"
                value="${esc(rule.from)}"
-               oninput="updateRule(${rule.id},'from',this.value)" />
+               oninput="updateRule(${rule.id},'from',this.value);renderRules()" />
       </div>
+      ${regexErr ? `<div class="regex-error">${esc(regexErr)}</div>` : ''}
       <div class="rule-row">
         <span class="rule-label">a</span>
         <input class="rule-field" type="text"
@@ -124,7 +182,7 @@ function renderRules() {
 }
 
 /* ════════════════════════════════
-   PROFILES (localStorage)
+   PROFILES (localStorage + JSON)
    ════════════════════════════════ */
 function loadProfiles() {
   try {
@@ -206,7 +264,7 @@ function applyProfile(name) {
   const existingRuleIds = rules.map(r => r.id);
   profileRules.forEach((r, i) => {
     if (!existingRuleIds.includes(r.id)) {
-      rules.push({ ...r, id: Date.now() + i, case_sensitive: !!r.case_sensitive });
+      rules.push({ ...r, id: Date.now() + i, case_sensitive: !!r.case_sensitive, enabled: r.enabled !== false });
     }
   });
   renderRules();
@@ -223,6 +281,43 @@ function deleteProfile(name) {
   if (document.getElementById('profile-select-label').textContent === name) {
     document.getElementById('profile-select-label').textContent = 'Cargar perfil…';
   }
+}
+
+/* ── IMPORT / EXPORT profiles ── */
+function exportProfiles() {
+  const keys = Object.keys(profilesData);
+  if (!keys.length) return showError('No hay perfiles para exportar.');
+  const blob = new Blob([JSON.stringify(profilesData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ofusca-perfiles.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function importProfiles(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (typeof data !== 'object' || Array.isArray(data)) throw new Error('Formato inválido');
+      for (const key of Object.keys(data)) {
+        if (!Array.isArray(data[key])) throw new Error(`"${key}" no es una lista de reglas`);
+      }
+      Object.assign(profilesData, data);
+      _persistProfiles();
+      loadProfiles();
+      showError(`Importados ${Object.keys(data).length} perfil(es) exitosamente`);
+    } catch (e) {
+      showError('Error al importar: ' + e.message);
+    }
+  };
+  reader.readAsText(input.files[0], 'utf-8');
+  input.value = '';
 }
 
 /* ════════════════════════════════
@@ -535,13 +630,24 @@ document.addEventListener('keydown', e => {
 });
 
 /* ════════════════════════════════
+   PWA — SERVICE WORKER
+   ════════════════════════════════ */
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+/* ════════════════════════════════
    INIT
    ════════════════════════════════ */
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  registerSW();
+  document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
   rules = [
-    { id: 1, type: 'literal', from: 'dominio.com', to: 'localhost.local', case_sensitive: false },
-    { id: 2, type: 'regex',   from: '10\\.1\\.',   to: '192.168.',        case_sensitive: false },
+    { id: 1, type: 'literal', from: 'dominio.com', to: 'localhost.local', case_sensitive: false, enabled: true },
+    { id: 2, type: 'regex',   from: '10\\.1\\.',   to: '192.168.',        case_sensitive: false, enabled: true },
   ];
   renderRules();
   loadProfiles();

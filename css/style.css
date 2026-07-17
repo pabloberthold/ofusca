@@ -1137,3 +1137,105 @@ html, body {
   background: var(--primary-hover);
   box-shadow: var(--shadow-sm);
 }
+
+/* ── DRAG HANDLE ── */
+.drag-handle {
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  cursor: grab;
+  user-select: none;
+  padding: 0 2px;
+  transition: color var(--transition);
+}
+.drag-handle:active { cursor: grabbing; }
+.rule-card:hover .drag-handle { color: var(--text-secondary); }
+.rule-card.dragging { opacity: 0.45; border-style: dashed; }
+
+/* ── ENABLE TOGGLE ── */
+.rule-enable-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  margin-right: auto;
+}
+.rule-enable-toggle input { display: none; }
+.toggle-track {
+  width: 24px;
+  height: 13px;
+  background: var(--border-strong);
+  border-radius: 7px;
+  position: relative;
+  transition: background var(--transition);
+}
+.toggle-knob {
+  position: absolute;
+  top: 1.5px;
+  left: 1.5px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+.rule-enable-toggle input:checked + .toggle-track {
+  background: var(--accent);
+}
+.rule-enable-toggle input:checked + .toggle-track .toggle-knob {
+  transform: translateX(11px);
+}
+.rule-disabled { opacity: 0.5; }
+.rule-disabled .rule-field { opacity: 0.6; }
+
+/* ── REGEX ERROR ── */
+.rule-field-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important;
+}
+.regex-error {
+  font-size: 9.5px;
+  color: var(--danger);
+  padding: 2px 0 4px 24px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* ── PROFILE IMPORT/EXPORT ── */
+.profile-actions {
+  display: flex;
+  gap: 6px;
+}
+.btn-profile-io {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all var(--transition);
+}
+.btn-profile-io:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+
+/* ── FOOTER VERSION ── */
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-version {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
