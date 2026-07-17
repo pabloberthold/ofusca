@@ -368,32 +368,80 @@ function importProfiles(input) {
 /* ════════════════════════════════
    URL SHARING
    ════════════════════════════════ */
+function getHashParams() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return {};
+  const params = {};
+  if (hash.includes('=')) {
+    hash.split('&').forEach(p => { const [k, v] = p.split('='); if (k && v) params[k] = v; });
+  } else {
+    params._legacy = hash;
+  }
+  return params;
+}
+
+function buildHash(params) {
+  const parts = [];
+  if (params.r) parts.push('r=' + params.r);
+  if (params.o) parts.push('o=' + params.o);
+  return parts.length ? '#' + parts.join('&') : '';
+}
+
 function encodeRulesToURL() {
   const active = rules.filter(r => r.from || r.to);
-  if (!active.length) { window.history.replaceState({}, '', window.location.pathname); return; }
+  const params = getHashParams();
+  if (!active.length && !params.o) {
+    window.history.replaceState({}, '', window.location.pathname);
+    return;
+  }
   try {
-    const encoded = btoa(JSON.stringify(active.map(r => ({
-      type: r.type, from: r.from, to: r.to,
-      case_sensitive: !!r.case_sensitive, enabled: r.enabled !== false
-    }))));
-    const url = new URL(window.location);
-    url.hash = encoded;
-    window.history.replaceState({}, '', url);
+    if (active.length) {
+      params.r = btoa(JSON.stringify(active.map(r => ({
+        type: r.type, from: r.from, to: r.to,
+        case_sensitive: !!r.case_sensitive, enabled: r.enabled !== false
+      }))));
+    } else {
+      delete params.r;
+    }
+    const hash = buildHash(params);
+    window.history.replaceState({}, '', hash ? window.location.pathname + hash : window.location.pathname);
   } catch {}
 }
 
+function encodeResultToURL(text) {
+  const params = getHashParams();
+  if (!text) { delete params.o; }
+  else { params.o = btoa(unescape(encodeURIComponent(text))); }
+  const hash = buildHash(params);
+  window.history.replaceState({}, '', hash ? window.location.pathname + hash : window.location.pathname);
+}
+
 function decodeRulesFromURL() {
-  const hash = window.location.hash.slice(1);
-  if (!hash) return;
+  const params = getHashParams();
+  const raw = params.r || params._legacy;
+  if (!raw) return;
   try {
-    const data = JSON.parse(atob(hash));
+    const data = JSON.parse(atob(raw));
     if (!Array.isArray(data)) return;
     rules = data.map((r, i) => ({ ...r, id: Date.now() + i }));
     renderRules();
   } catch {}
 }
 
-function copyShareLink() {
+function decodeResultFromURL() {
+  const params = getHashParams();
+  if (!params.o) return;
+  try {
+    const text = decodeURIComponent(escape(atob(params.o)));
+    document.getElementById('output-text').value = text;
+  } catch {}
+}
+
+function copyShareLink(withResult = false) {
+  if (withResult) {
+    const output = document.getElementById('output-text').value;
+    if (output) encodeResultToURL(output);
+  }
   const url = window.location.href;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => showError('Enlace copiado al portapapeles'));
@@ -495,6 +543,7 @@ function runText() {
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
+  encodeResultToURL(result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
@@ -509,6 +558,7 @@ function runTextReverse() {
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
   updateDiffView(text, result);
+  encodeResultToURL(result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
@@ -519,6 +569,7 @@ function clearOutput() {
   document.getElementById('diff-view').style.display = 'none';
   document.getElementById('output-text').style.display = '';
   document.getElementById('diff-btn').textContent = 'Diff';
+  encodeResultToURL('');
 }
 
 /* ════════════════════════════════
@@ -716,6 +767,7 @@ function clearAll() {
   diffMode = false;
   const db = document.getElementById('diff-btn');
   if (db) db.textContent = 'Diff';
+  encodeResultToURL('');
   document.getElementById('input-count').textContent = '0 caracteres';
   document.getElementById('stats-panel').style.display = 'none';
   clearError();
@@ -832,6 +884,7 @@ window.addEventListener('DOMContentLoaded', () => {
   registerSW();
   document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
   decodeRulesFromURL();
+  decodeResultFromURL();
   rules = [
     { id: 1, type: 'literal', from: 'dominio.com', to: 'localhost.local', case_sensitive: false, enabled: true },
     { id: 2, type: 'regex', from: '10\\.1\\.', to: '192.168.', case_sensitive: false, enabled: true },
