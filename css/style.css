@@ -105,16 +105,8 @@ html, body {
 }
 
 .sidebar-brand {
-  padding: 18px 20px 14px;
+  padding: 22px 20px 18px;
   border-bottom: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.brand-logo {
-  width: 40px;
-  height: auto;
-  margin-bottom: 8px;
 }
 .brand-name {
   font-size: 22px;
@@ -1241,4 +1233,12 @@ html, body {
   font-family: var(--font-mono);
   font-size: 10px;
   opacity: 0.6;
+}
+.site-footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.site-footer a:hover {
+  text-decoration: underline;
 }
