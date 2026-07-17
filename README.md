@@ -13,7 +13,8 @@
 - **Validación de regex**: feedback visual inmediato si un patrón es inválido
 - **Perfiles**: guardá, cargá, importá y exportá conjuntos de reglas reutilizables como JSON
 - **Transformación inversa**: aplicá las reglas al revés para revertir el ofuscamiento
-- **Diff visual**: compará entrada y salida línea por línea con colores
+- **Diff visual**: compará entrada y salida línea por línea con colores y numeración independiente
+- **Flash highlight**: al transformar, las palabras cambiadas se resaltan temporalmente en amarillo (dark) o verde (light)
 - **Compartí reglas por URL**: las reglas se codifican en el hash de la URL — copiá el enlace y compartilo
 - **Exportar reglas como texto**: copiá las reglas al portapapeles en formato legible
 - **Procesamiento batch**: seleccioná múltiples archivos y transformalos todos de una
