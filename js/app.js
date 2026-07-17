@@ -2,28 +2,35 @@
 
 const APP_VERSION = '1.0.0';
 const PROFILES_KEY = 'ofusca-profiles';
+const MAX_UNDO = 50;
 
-let rules        = [];
-let selectedFile = null;
-let activeTab    = 'text';
-let profilesData = {};
-let dropdownOpen = false;
-let configOpen   = false;
-let dragSrcIndex = null;
+let rules         = [];
+let selectedFiles = [];
+let activeTab     = 'text';
+let profilesData  = {};
+let dropdownOpen  = false;
+let configOpen    = false;
+let dragSrcIndex  = null;
+let rulesFilter   = '';
+let undoStack     = [];
+let redoStack     = [];
+let diffMode      = false;
 
 /* ════════════════════════════════
    THEME
    ════════════════════════════════ */
 function initTheme() {
-  const saved = localStorage.getItem('ofusca-theme') || 'light';
-  applyTheme(saved, false);
+  const saved = localStorage.getItem('ofusca-theme');
+  if (saved) { applyTheme(saved, false); return; }
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark ? 'dark' : 'light', false);
 }
 
 function applyTheme(t, animate = true) {
   if (animate) document.documentElement.style.transition = 'background 0.2s, color 0.2s';
   document.documentElement.setAttribute('data-theme', t);
   localStorage.setItem('ofusca-theme', t);
-  document.getElementById('icon-moon').style.display = t === 'dark'  ? '' : 'none';
+  document.getElementById('icon-moon').style.display = t === 'dark' ? '' : 'none';
   document.getElementById('icon-sun').style.display  = t === 'light' ? '' : 'none';
   if (animate) setTimeout(() => document.documentElement.style.transition = '', 300);
 }
@@ -62,24 +69,51 @@ function applyRules(text, rules) {
         totalMatches += count;
         rulesUsed++;
       }
-    } catch (e) {
-      /* skip invalid regex */
-    }
+    } catch (e) { /* skip invalid regex */ }
   }
   return { result: text, matches: totalMatches, rulesUsed };
+}
+
+/* ════════════════════════════════
+   UNDO / REDO
+   ════════════════════════════════ */
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(rules)));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.parse(JSON.stringify(rules)));
+  rules = undoStack.pop();
+  renderRules();
+  encodeRulesToURL();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.parse(JSON.stringify(rules)));
+  rules = redoStack.pop();
+  renderRules();
+  encodeRulesToURL();
 }
 
 /* ════════════════════════════════
    RULES
    ════════════════════════════════ */
 function addRule(type) {
+  pushUndo();
   rules.push({ id: Date.now(), type, from: '', to: '', case_sensitive: false, enabled: true });
   renderRules();
+  encodeRulesToURL();
 }
 
 function removeRule(id) {
+  pushUndo();
   rules = rules.filter(r => r.id !== id);
   renderRules();
+  encodeRulesToURL();
 }
 
 function updateRule(id, field, value) {
@@ -88,6 +122,7 @@ function updateRule(id, field, value) {
 }
 
 function toggleRuleEnabled(id) {
+  pushUndo();
   const r = rules.find(r => r.id === id);
   if (r) r.enabled = !r.enabled;
 }
@@ -96,6 +131,11 @@ function validateRegex(str) {
   if (!str) return null;
   try { new RegExp(str); return null; }
   catch (e) { return e.message; }
+}
+
+function filterRules(val) {
+  rulesFilter = val.toLowerCase();
+  renderRules();
 }
 
 /* ── DRAG & DROP ── */
@@ -122,14 +162,22 @@ function handleDragEnd(e) {
   e.target.closest('.rule-card').classList.remove('dragging');
   const list = document.getElementById('rules-list');
   const newOrder = Array.from(list.children).map(c => rules.find(r => r.id === +c.dataset.ruleId));
+  const changed = JSON.stringify(rules) !== JSON.stringify(newOrder.filter(Boolean));
+  if (changed) pushUndo();
   rules = newOrder.filter(Boolean);
   renderRules();
+  if (changed) encodeRulesToURL();
 }
 
 function renderRules() {
   const c = document.getElementById('rules-list');
   c.innerHTML = '';
-  rules.forEach(rule => {
+  const filtered = rulesFilter ? rules.filter(r =>
+    (r.from || '').toLowerCase().includes(rulesFilter) ||
+    (r.to || '').toLowerCase().includes(rulesFilter)
+  ) : rules;
+
+  filtered.forEach(rule => {
     const d = document.createElement('div');
     d.className = 'rule-card' + (rule.enabled === false ? ' rule-disabled' : '');
     d.draggable = true;
@@ -178,11 +226,14 @@ function renderRules() {
       </div>`;
     c.appendChild(d);
   });
+  if (rulesFilter && !filtered.length) {
+    c.innerHTML = '<div class="profile-dropdown-empty">Sin reglas que coincidan</div>';
+  }
   document.getElementById('rule-counter').textContent = rules.length;
 }
 
 /* ════════════════════════════════
-   PROFILES (localStorage + JSON)
+   PROFILES
    ════════════════════════════════ */
 function loadProfiles() {
   try {
@@ -197,11 +248,11 @@ function loadProfiles() {
 }
 
 function renderProfileDropdown() {
-  const list  = document.getElementById('profile-dropdown-list');
+  const list = document.getElementById('profile-dropdown-list');
   list.innerHTML = '';
   let names = Object.keys(profilesData).sort((a, b) => {
     if (a.toLowerCase() === 'default') return -1;
-    if (b.toLowerCase() === 'default') return  1;
+    if (b.toLowerCase() === 'default') return 1;
     return a.localeCompare(b);
   });
   if (!names.length) {
@@ -209,8 +260,8 @@ function renderProfileDropdown() {
     return;
   }
   names.forEach(name => {
-    const ruleCount  = (profilesData[name] || []).length;
-    const isDefault  = name.toLowerCase() === 'default';
+    const ruleCount = (profilesData[name] || []).length;
+    const isDefault = name.toLowerCase() === 'default';
     const d = document.createElement('div');
     d.className = 'profile-option' + (isDefault ? ' profile-option-default' : '');
     d.innerHTML = `
@@ -223,9 +274,9 @@ function renderProfileDropdown() {
 }
 
 function toggleProfileDropdown() {
-  const dd      = document.getElementById('profile-dropdown');
+  const dd = document.getElementById('profile-dropdown');
   const chevron = document.getElementById('profile-chevron');
-  dropdownOpen  = !dropdownOpen;
+  dropdownOpen = !dropdownOpen;
   dd.style.display = dropdownOpen ? 'block' : 'none';
   chevron.classList.toggle('open', dropdownOpen);
 }
@@ -244,10 +295,7 @@ function _persistProfiles() {
 
 function saveProfile() {
   const name = document.getElementById('profile-name').value.trim();
-  if (!name) {
-    document.getElementById('profile-name').focus();
-    return;
-  }
+  if (!name) { document.getElementById('profile-name').focus(); return; }
   profilesData[name] = serializeRules();
   _persistProfiles();
   document.getElementById('profile-name').value = '';
@@ -260,6 +308,7 @@ function saveProfile() {
 }
 
 function applyProfile(name) {
+  pushUndo();
   const profileRules = profilesData[name] || [];
   const existingRuleIds = rules.map(r => r.id);
   profileRules.forEach((r, i) => {
@@ -272,6 +321,7 @@ function applyProfile(name) {
   document.getElementById('profile-dropdown').style.display = 'none';
   document.getElementById('profile-chevron').classList.remove('open');
   dropdownOpen = false;
+  encodeRulesToURL();
 }
 
 function deleteProfile(name) {
@@ -290,11 +340,8 @@ function exportProfiles() {
   const blob = new Blob([JSON.stringify(profilesData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ofusca-perfiles.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.href = url; a.download = 'ofusca-perfiles.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
@@ -312,12 +359,69 @@ function importProfiles(input) {
       _persistProfiles();
       loadProfiles();
       showError(`Importados ${Object.keys(data).length} perfil(es) exitosamente`);
-    } catch (e) {
-      showError('Error al importar: ' + e.message);
-    }
+    } catch (e) { showError('Error al importar: ' + e.message); }
   };
   reader.readAsText(input.files[0], 'utf-8');
   input.value = '';
+}
+
+/* ════════════════════════════════
+   URL SHARING
+   ════════════════════════════════ */
+function encodeRulesToURL() {
+  const active = rules.filter(r => r.from || r.to);
+  if (!active.length) { window.history.replaceState({}, '', window.location.pathname); return; }
+  try {
+    const encoded = btoa(JSON.stringify(active.map(r => ({
+      type: r.type, from: r.from, to: r.to,
+      case_sensitive: !!r.case_sensitive, enabled: r.enabled !== false
+    }))));
+    const url = new URL(window.location);
+    url.hash = encoded;
+    window.history.replaceState({}, '', url);
+  } catch {}
+}
+
+function decodeRulesFromURL() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  try {
+    const data = JSON.parse(atob(hash));
+    if (!Array.isArray(data)) return;
+    rules = data.map((r, i) => ({ ...r, id: Date.now() + i }));
+    renderRules();
+  } catch {}
+}
+
+function copyShareLink() {
+  const url = window.location.href;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => showError('Enlace copiado al portapapeles'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showError('Enlace copiado al portapapeles');
+  }
+}
+
+/* ════════════════════════════════
+   EXPORT RULES AS TEXT
+   ════════════════════════════════ */
+function exportRulesSnippet() {
+  const serialized = serializeRules().filter(r => r.from);
+  if (!serialized.length) return showError('No hay reglas para exportar.');
+  const text = serialized.map(r => `${r.type === 'regex' ? 'REGEX' : 'LITERAL'}  ${r.from}  →  ${r.to}`).join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showError('Reglas copiadas al portapapeles'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showError('Reglas copiadas al portapapeles');
+  }
 }
 
 /* ════════════════════════════════
@@ -369,6 +473,7 @@ function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
+  if (tab === 'file') document.getElementById('file-input').click();
 }
 
 /* ════════════════════════════════
@@ -385,13 +490,11 @@ function runText() {
   const text = document.getElementById('input-text').value;
   if (!text.trim()) return showError('No hay texto en la entrada.');
   clearError();
-  const btn = document.querySelector('.run-btn');
-  btn.style.transform = 'scale(0.93)';
-  setTimeout(() => btn.style.transform = '', 120);
   const t0 = performance.now();
   const { result, matches, rulesUsed } = applyRules(text, serializeRules());
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
+  updateDiffView(text, result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
@@ -400,64 +503,152 @@ function runTextReverse() {
   const text = document.getElementById('input-text').value;
   if (!text.trim()) return showError('No hay texto en la entrada.');
   clearError();
-  const btn = document.querySelector('.run-btn-reverse');
-  btn.style.transform = 'scale(0.93)';
-  setTimeout(() => btn.style.transform = '', 120);
   const reversedRules = serializeRules().slice().reverse().map(r => ({ type: r.type, from: r.to, to: r.from }));
   const t0 = performance.now();
   const { result, matches, rulesUsed } = applyRules(text, reversedRules);
   const ms = Math.round((performance.now() - t0) * 100) / 100;
   document.getElementById('output-text').value = result;
+  updateDiffView(text, result);
   showStats({ matches, rules_used: rulesUsed, ms });
 }
 
 function clearOutput() {
   document.getElementById('output-text').value = '';
   document.getElementById('stats-panel').style.display = 'none';
+  diffMode = false;
+  document.getElementById('diff-view').style.display = 'none';
+  document.getElementById('output-text').style.display = '';
+  document.getElementById('diff-btn').textContent = 'Diff';
 }
 
 /* ════════════════════════════════
-   FILE TRANSFORM (client-side)
+   DIFF VIEW
    ════════════════════════════════ */
-function handleFileSelect(input) { if (input.files[0]) setFile(input.files[0]); }
+function toggleDiff() {
+  const input = document.getElementById('input-text').value;
+  const output = document.getElementById('output-text').value;
+  if (!output) return;
+  diffMode = !diffMode;
+  if (diffMode) {
+    document.getElementById('output-text').style.display = 'none';
+    document.getElementById('diff-view').style.display = 'block';
+    document.getElementById('diff-view').innerHTML = generateDiffHTML(input, output);
+    document.getElementById('diff-btn').textContent = 'Resultado';
+  } else {
+    document.getElementById('diff-view').style.display = 'none';
+    document.getElementById('output-text').style.display = '';
+    document.getElementById('diff-btn').textContent = 'Diff';
+  }
+}
+
+function updateDiffView(input, output) {
+  if (diffMode) {
+    document.getElementById('diff-view').innerHTML = generateDiffHTML(input, output);
+  }
+}
+
+function escHtml(s) {
+  return esc(s);
+}
+
+function generateDiffHTML(a, b) {
+  const linesA = a.split('\n');
+  const linesB = b.split('\n');
+  const max = Math.max(linesA.length, linesB.length);
+  let html = '<div class="diff-container"><table class="diff-table">';
+  for (let i = 0; i < max; i++) {
+    const lineA = i < linesA.length ? linesA[i] : '';
+    const lineB = i < linesB.length ? linesB[i] : '';
+    if (lineA === lineB) {
+      html += `<tr class="diff-same"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineA)}</td></tr>`;
+    } else {
+      if (lineA !== '') {
+        html += `<tr class="diff-removed"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineA)}</td></tr>`;
+      }
+      if (lineB !== '') {
+        html += `<tr class="diff-added"><td class="diff-num">${i + 1}</td><td class="diff-code">${escHtml(lineB)}</td></tr>`;
+      }
+    }
+  }
+  html += '</table></div>';
+  return html;
+}
+
+/* ════════════════════════════════
+   FILE / BATCH TRANSFORM
+   ════════════════════════════════ */
+function handleFileSelect(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  if (files.length === 1) {
+    setFile(files[0]);
+  } else {
+    setFiles(files);
+  }
+}
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  const files = Array.from(e.dataTransfer.files);
+  if (!files.length) return;
+  if (files.length === 1) setFile(files[0]);
+  else setFiles(files);
 }
 
 function setFile(f) {
-  selectedFile = f;
-  document.getElementById('drop-zone').style.display   = 'none';
-  document.getElementById('file-info').style.display   = 'flex';
-  document.getElementById('file-name').textContent     = f.name;
-  document.getElementById('file-size').textContent     = fmtBytes(f.size);
+  selectedFiles = [f];
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('file-info').style.display = 'flex';
+  document.getElementById('file-multi').style.display = 'none';
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-size').textContent = fmtBytes(f.size);
+  document.getElementById('btn-transform-file').textContent = 'Transformar y descargar';
+}
+
+function setFiles(files) {
+  selectedFiles = files;
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('file-multi').style.display = 'flex';
+  document.getElementById('file-count').textContent = `${files.length} archivos seleccionados`;
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  document.getElementById('file-total-size').textContent = fmtBytes(totalSize);
 }
 
 function clearFile() {
-  selectedFile = null;
-  document.getElementById('file-input').value          = '';
-  document.getElementById('drop-zone').style.display   = 'flex';
-  document.getElementById('file-info').style.display   = 'none';
+  selectedFiles = [];
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'flex';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('file-multi').style.display = 'none';
   document.getElementById('file-progress').style.display = 'none';
 }
 
 const MAX_FILE_MB = 100;
 
 function runFile() {
-  if (!selectedFile) return showError('Seleccioná un archivo primero.');
-  if (selectedFile.size > MAX_FILE_MB * 1024 * 1024) {
-    return showError(`El archivo supera el límite de ${MAX_FILE_MB} MB.`);
+  if (!selectedFiles.length) return showError('Seleccioná un archivo primero.');
+  for (const f of selectedFiles) {
+    if (f.size > MAX_FILE_MB * 1024 * 1024) {
+      return showError(`"${f.name}" supera el límite de ${MAX_FILE_MB} MB.`);
+    }
   }
   clearError();
+  if (selectedFiles.length === 1) {
+    processFile(selectedFiles[0], 0, 1);
+  } else {
+    processFileBatch();
+  }
+}
 
+function processFile(file, idx, total) {
   const progress = document.getElementById('file-progress');
-  const fill     = document.getElementById('progress-fill');
-  const label    = document.getElementById('progress-label');
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('progress-label');
   progress.style.display = 'flex';
   fill.style.width = '10%';
-  label.textContent = 'Leyendo archivo…';
+  label.textContent = total > 1 ? `[${idx + 1}/${total}] Leyendo ${file.name}…` : 'Leyendo archivo…';
 
   const reader = new FileReader();
   reader.onprogress = e => {
@@ -466,22 +657,16 @@ function runFile() {
       fill.style.width = pct + '%';
     }
   };
-
   reader.onload = () => {
     fill.style.width = '55%';
-    label.textContent = 'Aplicando reglas…';
+    label.textContent = total > 1 ? `[${idx + 1}/${total}] Aplicando reglas…` : 'Aplicando reglas…';
 
     let text;
-    const raw = reader.result;
     try {
-      text = typeof raw === 'string' ? raw : new TextDecoder('utf-8').decode(raw);
+      text = typeof reader.result === 'string' ? reader.result : new TextDecoder('utf-8').decode(reader.result);
     } catch {
-      try {
-        text = new TextDecoder('latin-1').decode(raw);
-      } catch {
-        progress.style.display = 'none';
-        return showError('No se pudo decodificar el archivo.');
-      }
+      try { text = new TextDecoder('latin-1').decode(reader.result); }
+      catch { progress.style.display = 'none'; showError(`No se pudo decodificar "${file.name}".`); return; }
     }
 
     const t0 = performance.now();
@@ -489,42 +674,48 @@ function runFile() {
     const ms = Math.round((performance.now() - t0) * 100) / 100;
 
     fill.style.width = '85%';
-    label.textContent = 'Preparando descarga…';
+    label.textContent = total > 1 ? `[${idx + 1}/${total}] Descargando ${file.name}…` : 'Preparando descarga…';
 
     const blob = new Blob([result], { type: 'text/plain;charset=utf-8' });
-    const original = selectedFile.name;
-    const idx = original.lastIndexOf('.');
-    const outName = idx !== -1 ? `${original.slice(0, idx)}-ofusca${original.slice(idx)}` : `${original}-ofusca`;
+    const extIdx = file.name.lastIndexOf('.');
+    const outName = extIdx !== -1 ? `${file.name.slice(0, extIdx)}-ofusca${file.name.slice(extIdx)}` : `${file.name}-ofusca`;
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = outName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = outName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-    fill.style.width = '100%';
-    label.textContent = `✓ Listo — ${matches} reemplazos · ${rulesUsed} reglas · ${ms} ms`;
-    showStats({ matches, rules_used: rulesUsed, ms });
-    setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 6000);
+    if (idx + 1 < total) {
+      fill.style.width = '100%';
+      setTimeout(() => { fill.style.width = '10%'; processFile(selectedFiles[idx + 1], idx + 1, total); }, 500);
+    } else {
+      fill.style.width = '100%';
+      label.textContent = `✓ ${total} archivo${total !== 1 ? 's' : ''} transformado${total !== 1 ? 's' : ''}`;
+      showStats({ matches, rules_used: rulesUsed, ms });
+      setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 5000);
+    }
   };
+  reader.onerror = () => { progress.style.display = 'none'; showError(`Error al leer "${file.name}".`); };
+  reader.readAsText(file, 'utf-8');
+}
 
-  reader.onerror = () => {
-    progress.style.display = 'none';
-    showError('Error al leer el archivo.');
-  };
-
-  reader.readAsText(selectedFile, 'utf-8');
+function processFileBatch() {
+  processFile(selectedFiles[0], 0, selectedFiles.length);
 }
 
 /* ════════════════════════════════
    CLEAR / COPY
    ════════════════════════════════ */
 function clearAll() {
-  document.getElementById('input-text').value  = '';
+  document.getElementById('input-text').value = '';
   document.getElementById('output-text').value = '';
+  document.getElementById('diff-view').innerHTML = '';
+  document.getElementById('diff-view').style.display = 'none';
+  document.getElementById('output-text').style.display = '';
+  diffMode = false;
+  const db = document.getElementById('diff-btn');
+  if (db) db.textContent = 'Diff';
   document.getElementById('input-count').textContent = '0 caracteres';
   document.getElementById('stats-panel').style.display = 'none';
   clearError();
@@ -532,27 +723,20 @@ function clearAll() {
 }
 
 async function copyResult() {
-  const textArea = document.getElementById('output-text');
-  const text = textArea.value;
+  const text = document.getElementById('output-text').value;
   if (!text) return;
   let success = false;
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      success = true;
+      await navigator.clipboard.writeText(text); success = true;
     }
   } catch (_) {}
   if (!success) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-      success = document.execCommand('copy');
-    } catch (_) {}
-    document.body.removeChild(textarea);
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { success = document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
   }
   if (success) {
     const btn = document.getElementById('copy-btn');
@@ -570,9 +754,7 @@ async function copyResult() {
    ════════════════════════════════ */
 function serializeRules() {
   return rules.map(r => ({
-    type: r.type,
-    from: r.from,
-    to: r.to,
+    type: r.type, from: r.from, to: r.to,
     case_sensitive: !!r.case_sensitive,
     enabled: r.enabled !== undefined ? r.enabled : undefined
   }));
@@ -580,9 +762,9 @@ function serializeRules() {
 
 function showStats(s) {
   document.getElementById('stats-panel').style.display = 'flex';
-  document.getElementById('stat-matches').textContent  = s.matches    ?? 0;
-  document.getElementById('stat-rules').textContent    = s.rules_used ?? 0;
-  document.getElementById('stat-ms').textContent       = s.ms != null ? (s.ms < 1 ? '<1' : s.ms) : 0;
+  document.getElementById('stat-matches').textContent = s.matches ?? 0;
+  document.getElementById('stat-rules').textContent = s.rules_used ?? 0;
+  document.getElementById('stat-ms').textContent = s.ms != null ? (s.ms < 1 ? '<1' : s.ms) : 0;
 }
 
 function showError(msg) {
@@ -597,14 +779,12 @@ function clearError() {
 }
 
 function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function fmtBytes(b) {
-  if (b < 1024)     return `${b} B`;
-  if (b < 1048576)  return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
   return `${(b / 1048576).toFixed(1)} MB`;
 }
 
@@ -612,6 +792,12 @@ function fmtBytes(b) {
    KEYBOARD SHORTCUTS
    ════════════════════════════════ */
 document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault(); undo(); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault(); redo(); return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') {
     e.preventDefault();
     if (activeTab === 'text') runTextReverse();
@@ -620,7 +806,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     if (activeTab === 'text') runText();
-    else if (activeTab === 'file' && selectedFile) runFile();
+    else if (activeTab === 'file' && selectedFiles.length) runFile();
   }
   if (e.key === 'Escape' && dropdownOpen) {
     document.getElementById('profile-dropdown').style.display = 'none';
@@ -630,7 +816,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ════════════════════════════════
-   PWA — SERVICE WORKER
+   PWA
    ════════════════════════════════ */
 function registerSW() {
   if ('serviceWorker' in navigator) {
@@ -645,23 +831,21 @@ window.addEventListener('DOMContentLoaded', () => {
   initTheme();
   registerSW();
   document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
+  decodeRulesFromURL();
   rules = [
     { id: 1, type: 'literal', from: 'dominio.com', to: 'localhost.local', case_sensitive: false, enabled: true },
-    { id: 2, type: 'regex',   from: '10\\.1\\.',   to: '192.168.',        case_sensitive: false, enabled: true },
+    { id: 2, type: 'regex', from: '10\\.1\\.', to: '192.168.', case_sensitive: false, enabled: true },
   ];
-  renderRules();
+  if (!window.location.hash.slice(1)) {
+    renderRules();
+  }
   loadProfiles();
 });
 
 function activarNeonBox(selector = '.editor-pane') {
   const el = document.querySelector(selector);
   if (!el) return;
-  if (el._neonTimeout) {
-    clearTimeout(el._neonTimeout);
-  }
+  if (el._neonTimeout) clearTimeout(el._neonTimeout);
   el.classList.add('neon-box');
-  el._neonTimeout = setTimeout(() => {
-    el.classList.remove('neon-box');
-    el._neonTimeout = null;
-  }, 15000);
+  el._neonTimeout = setTimeout(() => { el.classList.remove('neon-box'); el._neonTimeout = null; }, 15000);
 }

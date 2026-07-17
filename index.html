@@ -77,6 +77,8 @@
         <span class="counter-badge" id="rule-counter">0</span>
       </div>
 
+      <input type="text" id="rules-filter" class="rules-filter-input" placeholder="Buscar en reglas…" oninput="filterRules(this.value)" />
+
       <div id="rules-list"></div>
 
       <div class="rules-add-bar">
@@ -87,6 +89,9 @@
         <button class="add-rule-btn" onclick="addRule('regex')">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Regex
+        </button>
+        <button class="add-rule-btn add-rule-btn-sm" onclick="exportRulesSnippet()" title="Copiar reglas como texto">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
       </div>
     </div>
@@ -110,12 +115,21 @@
       </div>
 
       <div class="toolbar-actions">
+        <button class="toolbar-btn toolbar-btn-icon" onclick="undo()" title="Deshacer  Ctrl+Z">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+        <button class="toolbar-btn toolbar-btn-icon" onclick="redo()" title="Rehacer  Ctrl+Shift+Z">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+        <button class="toolbar-btn toolbar-btn-icon" onclick="copyShareLink()" title="Copiar enlace con reglas">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
         <button class="toolbar-btn toolbar-btn-config" onclick="toggleConfigPanel()" title="Configuración">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
         <button class="toolbar-btn" onclick="clearAll()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-          Limpiar pantalla
+          Limpiar
         </button>
         <button class="toolbar-btn toolbar-btn-theme" onclick="toggleTheme()" title="Cambiar tema" id="theme-btn">
           <span id="icon-moon">
@@ -164,13 +178,16 @@
               Resultado
             </div>
             <div class="pane-actions">
+              <button class="action-btn" id="diff-btn" onclick="toggleDiff()" title="Ver diff con entrada">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/><line x1="5" y1="3" x2="19" y2="3"/></svg>
+                Diff
+              </button>
               <button class="action-btn" id="copy-btn" onclick="copyResult()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 Copiar
               </button>
               <button class="action-btn" onclick="clearOutput()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Limpiar
               </button>
             </div>
           </div>
@@ -178,6 +195,7 @@
                     placeholder="El resultado aparecerá aquí después de transformar…"
                     spellcheck="false"
                     readonly></textarea>
+          <div id="diff-view" class="diff-view" style="display:none"></div>
         </div>
 
       </div>
@@ -195,9 +213,9 @@
           <div class="drop-icon">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <div class="drop-title">Arrastrá un archivo o hacé clic para seleccionar</div>
-          <div class="drop-hint">Cualquier archivo de texto (máx. 100 MB): .txt .conf .yaml .xml .sql .log .env .ini…</div>
-          <input type="file" id="file-input" style="display:none" onchange="handleFileSelect(this)" />
+          <div class="drop-title">Arrastrá archivos o hacé clic para seleccionar</div>
+          <div class="drop-hint">Uno o varios archivos de texto (máx. 100 MB c/u): .txt .conf .yaml .xml .sql .log .env .ini…</div>
+          <input type="file" id="file-input" style="display:none" onchange="handleFileSelect(this)" multiple />
         </div>
 
         <div class="file-selected" id="file-info" style="display:none;">
@@ -213,9 +231,28 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <button class="btn-transform-file" onclick="runFile()">
+          <button class="btn-transform-file" id="btn-transform-file" onclick="runFile()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
             Transformar y descargar
+          </button>
+        </div>
+
+        <div class="file-selected file-multi-info" id="file-multi" style="display:none;">
+          <div class="file-selected-info">
+            <div class="file-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            </div>
+            <div class="file-meta">
+              <div class="file-name" id="file-count"></div>
+              <div class="file-size" id="file-total-size"></div>
+            </div>
+            <button class="btn-remove-file" onclick="clearFile()" title="Quitar archivos">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <button class="btn-transform-file" onclick="runFile()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Transformar y descargar todos
           </button>
         </div>
 

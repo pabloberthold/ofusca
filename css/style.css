@@ -238,10 +238,34 @@ html, body {
 }
 .rule-field::placeholder { color: var(--text-muted); }
 
+.rules-filter-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-sans);
+  padding: 5px 8px;
+  outline: none;
+  margin-bottom: 8px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.rules-filter-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.rules-filter-input::placeholder { color: var(--text-muted); }
+
 .rules-add-bar {
   display: flex;
-  gap: 7px;
+  gap: 6px;
   margin-top: 2px;
+}
+.add-rule-btn-sm {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  min-width: 32px;
 }
 .add-rule-btn {
   flex: 1;
@@ -517,6 +541,26 @@ html, body {
 }
 .toolbar-btn-theme:hover {
   color: var(--text-primary) !important;
+}
+
+.toolbar-btn-icon {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  width: 32px;
+  height: 32px;
+}
+.toolbar-btn-icon:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--accent);
 }
 
 .toolbar-btn-config {
@@ -1241,3 +1285,41 @@ html, body {
 .site-footer a:hover {
   text-decoration: underline;
 }
+
+/* ── DIFF VIEW ── */
+.diff-view {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-input);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.diff-table td {
+  padding: 1px 10px;
+  vertical-align: top;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-num {
+  width: 40px;
+  text-align: right;
+  color: var(--text-muted);
+  user-select: none;
+  border-right: 1px solid var(--border-subtle);
+  padding-right: 10px !important;
+  font-size: 11px;
+}
+.diff-code { padding-left: 12px !important; }
+.diff-same td { color: var(--text-secondary); }
+.diff-added td { background: rgba(16,185,129,0.12); color: var(--success); }
+.diff-removed td { background: rgba(239,68,68,0.10); color: var(--danger); }
+
+/* ── MULTI-FILE ── */
+.file-multi-info { display: flex; }
