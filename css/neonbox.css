@@ -19,7 +19,7 @@
     transparent 150deg,
     transparent 360deg
   );
-  animation: spin 3.5s linear infinite;
+  animation: spin 3s linear infinite;
 }
 
 .neon-box::after {

@@ -871,7 +871,7 @@ function activarNeonBox(selector = '.editor-pane') {
   if (!el) return;
   if (el._neonTimeout) clearTimeout(el._neonTimeout);
   el.classList.add('neon-box');
-  el._neonTimeout = setTimeout(() => { el.classList.remove('neon-box'); el._neonTimeout = null; }, 1200);
+  el._neonTimeout = setTimeout(() => { el.classList.remove('neon-box'); el._neonTimeout = null; }, 3000);
 }
 
 function flashHighlight(input, output) {
@@ -912,7 +912,7 @@ function flashHighlight(input, output) {
       flash.remove();
       textarea.style.display = '';
     }, 500);
-  }, 4000);
+  }, 3000);
 }
 
 function tokenHighlight(lineA, lineB) {
