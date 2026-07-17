@@ -537,7 +537,6 @@ function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
-  if (tab === 'file') document.getElementById('file-input').click();
 }
 
 /* ════════════════════════════════
