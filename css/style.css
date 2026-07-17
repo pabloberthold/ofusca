@@ -122,6 +122,12 @@ html, body {
   text-transform: uppercase;
   margin-top: 3px;
 }
+.brand-privacy {
+  font-size: 9.5px;
+  color: var(--success);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
 
 .sidebar-block {
   padding: 14px 14px 12px;
